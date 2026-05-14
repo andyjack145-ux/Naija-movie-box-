@@ -1,0 +1,48 @@
+/* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */  
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');  
+  
+/* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */  
+@import 'tailwindcss/base';  
+@import 'tailwindcss/components';  
+@import 'tailwindcss/utilities';  
+  
+/* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */  
+  
+:root {  
+  --primary: #008751;  
+  --primary-hover: #006b40;  
+  --bg-dark: #0a0a0a;  
+  --bg-card: #1a1a1a;  
+  --bg-card-hover: #262626;  
+  --text-main: #ffffff;  
+  --text-muted: #a3a3a3;  
+}  
+body {  
+  font-family: 'Inter', sans-serif;  
+  background-color: var(--bg-dark);  
+  color: var(--text-main);  
+  -webkit-font-smoothing: antialiased;  
+}  
+/* Custom scrollbar for a cinematic feel */  
+::-webkit-scrollbar {  
+  width: 8px;  
+  height: 8px;  
+}  
+::-webkit-scrollbar-track {  
+  background: var(--bg-dark);  
+}  
+::-webkit-scrollbar-thumb {  
+  background: #333;  
+  border-radius: 4px;  
+}  
+::-webkit-scrollbar-thumb:hover {  
+  background: #555;  
+}  
+/* Hide scrollbar for horizontal scrolling containers but keep functionality */  
+.hide-scrollbar::-webkit-scrollbar {  
+  display: none;  
+}  
+.hide-scrollbar {  
+  -ms-overflow-style: none;  
+  scrollbar-width: none;  
+}
