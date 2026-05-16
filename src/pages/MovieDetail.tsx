@@ -2,6 +2,7 @@ import React from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { MOCK_MOVIES } from '../data/mockData'
 
+
 export function MovieDetail() {
   const { id } = useParams()
 

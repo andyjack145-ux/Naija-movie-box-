@@ -6,6 +6,12 @@ export interface Movie {
   synopsis: string
   year: number
   rating: number
+  duration?: string
+  genres?: string[]
+  cast?: string[]
+  category?: string
+  isTrending?: boolean
+  isNewRelease?: boolean
   access?: 'free' | 'paid'
   price?: number
 }
