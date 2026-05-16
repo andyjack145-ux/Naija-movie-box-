@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { MOCK_MOVIES } from '../data/mockData'
 import { getAllMovies, isMoviePaid } from '../utils/storage'
@@ -6,7 +6,6 @@ import { toStreamableUrl, detectCloudSource } from '../utils/cloudUrl'
 import { Movie } from '../types'
 import { useAuth } from '../context/AuthContext'
 
-const FALLBACK_URL = 'https://www.w3schools.com/html/mov_bbb.mp4'
 const AD_DURATION = 10
 
 export function Player() {
@@ -14,9 +13,9 @@ export function Player() {
   const { user } = useAuth()
   const [movie, setMovie] = useState<Movie | null>(null)
   const [paid, setPaid] = useState(false)
-  const [adPlaying, setAdPlaying] = useState(false)
   const [adCountdown, setAdCountdown] = useState(AD_DURATION)
   const [adDone, setAdDone] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     const all = getAllMovies(MOCK_MOVIES)
@@ -25,34 +24,33 @@ export function Player() {
     if (found && user?.email) {
       const hasPaid = isMoviePaid(found.id, user.email)
       setPaid(hasPaid)
-      if (!hasPaid && found.access !== 'paid') {
-        setAdPlaying(true)
-      } else {
-        setAdDone(true)
-      }
-    } else {
-      setAdPlaying(true)
+      if (hasPaid) setAdDone(true)
     }
   }, [id, user])
 
   useEffect(() => {
-    if (!adPlaying) return
+    if (adDone) return
     if (adCountdown <= 0) {
-      setAdPlaying(false)
       setAdDone(true)
       return
     }
     const t = setTimeout(() => setAdCountdown((n) => n - 1), 1000)
     return () => clearTimeout(t)
-  }, [adPlaying, adCountdown])
+  }, [adCountdown, adDone])
 
   if (!movie) return (
     <div className="min-h-screen flex items-center justify-center text-gray-400">Movie not found.</div>
   )
 
-  const rawUrl = movie.videoUrl || FALLBACK_URL
-  const source = detectCloudSource(rawUrl)
-  const streamUrl = toStreamableUrl(rawUrl)
+  if (!movie.videoUrl) return (
+    <div className="min-h-screen flex flex-col items-center justify-center text-gray-400 gap-4">
+      <p>No video has been uploaded for this movie yet.</p>
+      <Link to={`/movie/${movie.id}`} className="text-green-500 hover:underline">← Go back</Link>
+    </div>
+  )
+
+  const source = detectCloudSource(movie.videoUrl)
+  const streamUrl = toStreamableUrl(movie.videoUrl)
 
   return (
     <div className="min-h-screen bg-black">
@@ -63,62 +61,63 @@ export function Player() {
 
         <h1 className="text-2xl font-bold mb-4">{movie.title}</h1>
 
-        {adPlaying && (
-          <div className="relative w-full aspect-video bg-[#111] rounded-xl overflow-hidden mb-4 flex flex-col items-center justify-center">
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-              <div className="bg-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-4 self-start">
+        <div className="relative w-full aspect-video bg-[#0a0a0a] rounded-xl overflow-hidden">
+          {/* Ad overlay */}
+          {!adDone && (
+            <div className="absolute inset-0 z-10 bg-[#0d0d0d] flex flex-col items-center justify-center p-8 text-center">
+              <span className="bg-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-6 self-start absolute top-4 left-4">
                 AD
+              </span>
+              <div className="max-w-sm">
+                <p className="text-3xl font-black mb-3">9JA STREAM Premium</p>
+                <p className="text-gray-400 mb-6 text-sm">Skip ads and watch unlimited movies with a premium plan</p>
+                <Link
+                  to="/upgrade"
+                  className="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-xl text-sm font-semibold transition-colors inline-block mb-6"
+                >
+                  Go Premium
+                </Link>
+                <p className="text-gray-500 text-sm">
+                  Your movie starts in <span className="text-white font-bold text-lg">{adCountdown}</span>s
+                </p>
               </div>
-              <p className="text-2xl font-bold mb-2">9JA STREAM Premium</p>
-              <p className="text-gray-400 mb-4">Watch ad-free with a premium subscription</p>
-              <Link
-                to="/upgrade"
-                className="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-xl text-sm font-semibold transition-colors"
-              >
-                Upgrade Now
-              </Link>
-              <p className="text-gray-500 text-sm mt-6">
-                Movie starts in <span className="text-white font-bold">{adCountdown}s</span>
-              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {adDone && (
-          <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
-            {source === 'gdrive' ? (
-              <iframe
-                src={streamUrl}
-                className="w-full h-full"
-                allow="autoplay"
-                allowFullScreen
-                title={movie.title}
-              />
-            ) : source === 'dropbox' ? (
-              <video
-                src={streamUrl}
-                controls
-                autoPlay
-                className="w-full h-full"
-              >
-                Your browser does not support video playback.
-              </video>
-            ) : (
-              <video
-                src={streamUrl}
-                controls
-                autoPlay
-                className="w-full h-full"
-              >
-                Your browser does not support video playback.
-              </video>
-            )}
-          </div>
-        )}
+          {/* Video player */}
+          {source === 'gdrive' ? (
+            <iframe
+              src={streamUrl}
+              className="w-full h-full"
+              allow="autoplay; fullscreen"
+              allowFullScreen
+              title={movie.title}
+              style={{ border: 'none' }}
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              src={streamUrl}
+              controls
+              autoPlay={adDone}
+              className="w-full h-full"
+              onError={() => console.error('Video failed to load:', streamUrl)}
+            >
+              Your browser does not support video playback.
+            </video>
+          )}
+        </div>
 
-        {paid && (
-          <p className="text-green-500 text-sm mt-3">Premium — watching ad-free</p>
-        )}
+        <div className="mt-4 flex items-center gap-3">
+          {paid && (
+            <span className="text-green-500 text-sm font-medium">✓ Premium — watching ad-free</span>
+          )}
+          {!paid && adDone && (
+            <Link to="/upgrade" className="text-yellow-500 text-sm hover:underline">
+              Upgrade to remove ads
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -1,5 +1,7 @@
 import { Movie } from '../types'
 
+const DEMO_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+
 export const MOCK_MOVIES: Movie[] = [
   {
     id: '1',
@@ -17,6 +19,8 @@ export const MOCK_MOVIES: Movie[] = [
       'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=1200',
     category: 'Nollywood',
     isTrending: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '2',
@@ -34,6 +38,8 @@ export const MOCK_MOVIES: Movie[] = [
       'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?auto=format&fit=crop&q=80&w=1200',
     category: 'Nollywood',
     isTrending: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '3',
@@ -50,6 +56,8 @@ export const MOCK_MOVIES: Movie[] = [
     backdropUrl:
       'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200',
     category: 'Nollywood',
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '4',
@@ -67,6 +75,8 @@ export const MOCK_MOVIES: Movie[] = [
       'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&q=80&w=1200',
     category: 'Nollywood',
     isNewRelease: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '5',
@@ -85,6 +95,8 @@ export const MOCK_MOVIES: Movie[] = [
     category: 'Nollywood',
     isTrending: true,
     isNewRelease: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '6',
@@ -103,6 +115,9 @@ export const MOCK_MOVIES: Movie[] = [
     category: 'Hollywood',
     isTrending: true,
     isNewRelease: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'paid',
+    price: 300,
   },
   {
     id: '7',
@@ -119,6 +134,8 @@ export const MOCK_MOVIES: Movie[] = [
     backdropUrl:
       'https://images.unsplash.com/photo-1447433589675-4aaa569f3e05?auto=format&fit=crop&q=80&w=1200',
     category: 'Hollywood',
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '8',
@@ -136,6 +153,8 @@ export const MOCK_MOVIES: Movie[] = [
       'https://images.unsplash.com/photo-1595769816263-9b910be24d5f?auto=format&fit=crop&q=80&w=1200',
     category: 'Bollywood',
     isTrending: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '9',
@@ -152,6 +171,8 @@ export const MOCK_MOVIES: Movie[] = [
     backdropUrl:
       'https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&q=80&w=1200',
     category: 'K-Drama',
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
   {
     id: '10',
@@ -170,5 +191,7 @@ export const MOCK_MOVIES: Movie[] = [
     category: 'Series',
     isTrending: true,
     isNewRelease: true,
+    videoUrl: DEMO_VIDEO,
+    access: 'free',
   },
 ]

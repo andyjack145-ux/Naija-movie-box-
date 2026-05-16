@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { saveMovie, getSavedMovies, deleteMovie } from '../utils/storage'
 import { Movie } from '../types'
 
 const ADMIN_PASSWORD = 'admin9ja'
-
 const CATEGORIES = ['Nollywood', 'Hollywood', 'Bollywood', 'K-Drama', 'Series', 'Other']
 
 function generateId() {
@@ -28,6 +27,8 @@ const emptyForm = {
   isNewRelease: true,
 }
 
+type UploadMode = 'link' | 'file'
+
 export function Admin() {
   const [authed, setAuthed] = useState(false)
   const [pw, setPw] = useState('')
@@ -36,6 +37,14 @@ export function Admin() {
   const [movies, setMovies] = useState<Movie[]>([])
   const [saved, setSaved] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [uploadMode, setUploadMode] = useState<UploadMode>('file')
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadError, setUploadError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 
   useEffect(() => {
     setMovies(getSavedMovies())
@@ -51,17 +60,65 @@ export function Admin() {
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-    const { name, value, type } = e.target
+    const { name, value } = e.target
     setForm((f) => ({
       ...f,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked
-        : name === 'year' || name === 'price' || name === 'rating' ? Number(value)
-        : value,
+      [name]: name === 'year' || name === 'price' || name === 'rating' ? Number(value) : value,
     }))
   }
 
   function handleCheckbox(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.checked }))
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!cloudName || !uploadPreset) {
+      setUploadError('Cloudinary is not configured. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to your secrets.')
+      return
+    }
+
+    setUploading(true)
+    setUploadError('')
+    setUploadProgress(0)
+
+    const data = new FormData()
+    data.append('file', file)
+    data.append('upload_preset', uploadPreset)
+    data.append('resource_type', 'video')
+
+    return new Promise<void>((resolve) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`)
+
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          setUploadProgress(Math.round((ev.loaded / ev.total) * 100))
+        }
+      }
+
+      xhr.onload = () => {
+        setUploading(false)
+        if (xhr.status === 200) {
+          const res = JSON.parse(xhr.responseText)
+          setForm((f) => ({ ...f, videoUrl: res.secure_url }))
+          setUploadProgress(100)
+        } else {
+          setUploadError('Upload failed. Check your Cloudinary credentials.')
+        }
+        resolve()
+      }
+
+      xhr.onerror = () => {
+        setUploading(false)
+        setUploadError('Upload failed. Please try again.')
+        resolve()
+      }
+
+      xhr.send(data)
+    })
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -88,6 +145,7 @@ export function Admin() {
     setMovies(getSavedMovies())
     setForm(emptyForm)
     setEditingId(null)
+    setUploadProgress(0)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -149,7 +207,16 @@ export function Admin() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-2 text-green-500">Admin Panel</h1>
-      <p className="text-gray-400 mb-8 text-sm">Add movies using Google Drive or Dropbox share links</p>
+      <p className="text-gray-400 mb-8 text-sm">Upload videos directly or paste a Google Drive / Dropbox link</p>
+
+      {!cloudName && (
+        <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4 mb-6 text-sm text-yellow-300">
+          <strong>Direct upload not configured.</strong> To enable uploading video files from your computer, add{' '}
+          <code className="bg-black/30 px-1 rounded">VITE_CLOUDINARY_CLOUD_NAME</code> and{' '}
+          <code className="bg-black/30 px-1 rounded">VITE_CLOUDINARY_UPLOAD_PRESET</code> to your Replit Secrets.
+          You can still paste Google Drive or Dropbox links below.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="bg-[#111] border border-[#222] rounded-2xl p-6 mb-10 space-y-4">
         <h2 className="text-xl font-semibold mb-2">
@@ -221,22 +288,82 @@ export function Admin() {
         </div>
 
         <div>
-          <label className="text-sm text-gray-400 mb-1 block">Backdrop Image URL (optional, uses poster if blank)</label>
+          <label className="text-sm text-gray-400 mb-1 block">Backdrop Image URL (optional)</label>
           <input name="backdropUrl" value={form.backdropUrl} onChange={handleChange}
-            placeholder="https://... (wide banner image)"
+            placeholder="https://... (wide banner image, uses poster if blank)"
             className="w-full p-3 rounded-lg bg-[#222] text-white outline-none focus:ring-2 focus:ring-green-500" />
         </div>
 
-        <div>
-          <label className="text-sm text-gray-400 mb-1 block">
-            Video URL — Google Drive or Dropbox share link *
-          </label>
-          <input name="videoUrl" value={form.videoUrl} onChange={handleChange} required
-            placeholder="https://drive.google.com/file/d/... or https://www.dropbox.com/..."
-            className="w-full p-3 rounded-lg bg-[#222] text-white outline-none focus:ring-2 focus:ring-green-500" />
-          <p className="text-xs text-gray-500 mt-1">
-            Google Drive: share link with "Anyone with the link" access. Dropbox: share link ending in ?dl=0
-          </p>
+        {/* Video section */}
+        <div className="border border-[#2a2a2a] rounded-xl p-4">
+          <label className="text-sm text-gray-300 font-medium mb-3 block">Video Source *</label>
+
+          <div className="flex gap-2 mb-4">
+            <button type="button"
+              onClick={() => setUploadMode('file')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === 'file' ? 'bg-green-600 text-white' : 'bg-[#222] text-gray-400 hover:bg-[#2a2a2a]'}`}>
+              Upload File
+            </button>
+            <button type="button"
+              onClick={() => setUploadMode('link')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${uploadMode === 'link' ? 'bg-green-600 text-white' : 'bg-[#222] text-gray-400 hover:bg-[#2a2a2a]'}`}>
+              Paste Link
+            </button>
+          </div>
+
+          {uploadMode === 'file' ? (
+            <div>
+              <div
+                onClick={() => fileRef.current?.click()}
+                className="border-2 border-dashed border-[#333] hover:border-green-600 rounded-xl p-8 text-center cursor-pointer transition-colors"
+              >
+                {uploading ? (
+                  <div>
+                    <p className="text-gray-300 mb-3">Uploading... {uploadProgress}%</p>
+                    <div className="w-full bg-[#222] rounded-full h-2">
+                      <div
+                        className="bg-green-500 h-2 rounded-full transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : form.videoUrl && uploadProgress === 100 ? (
+                  <div>
+                    <p className="text-green-400 font-medium mb-1">Upload complete!</p>
+                    <p className="text-xs text-gray-500 truncate">{form.videoUrl}</p>
+                    <p className="text-xs text-gray-500 mt-2">Click to upload a different file</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-4xl mb-3">🎬</p>
+                    <p className="text-gray-300 font-medium mb-1">Click to select a video file</p>
+                    <p className="text-xs text-gray-500">MP4, MKV, AVI, MOV supported</p>
+                    {!cloudName && (
+                      <p className="text-xs text-yellow-500 mt-2">Configure Cloudinary to enable direct uploads</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={!cloudName}
+              />
+              {uploadError && <p className="text-red-400 text-sm mt-2">{uploadError}</p>}
+            </div>
+          ) : (
+            <div>
+              <input name="videoUrl" value={form.videoUrl} onChange={handleChange}
+                placeholder="https://drive.google.com/file/d/... or https://www.dropbox.com/..."
+                className="w-full p-3 rounded-lg bg-[#222] text-white outline-none focus:ring-2 focus:ring-green-500" />
+              <p className="text-xs text-gray-500 mt-2">
+                Google Drive: set sharing to "Anyone with the link". Dropbox: use the share link ending in ?dl=0
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-6 items-center">
@@ -271,8 +398,8 @@ export function Admin() {
         </div>
 
         <div className="flex gap-3 pt-2">
-          <button type="submit"
-            className="bg-green-600 hover:bg-green-700 transition-colors px-8 py-3 rounded-xl font-semibold">
+          <button type="submit" disabled={uploading}
+            className="bg-green-600 hover:bg-green-700 transition-colors px-8 py-3 rounded-xl font-semibold disabled:opacity-50">
             {editingId ? 'Update Movie' : 'Add Movie'}
           </button>
           {editingId && (
@@ -281,7 +408,7 @@ export function Admin() {
               Cancel
             </button>
           )}
-          {saved && <span className="text-green-400 self-center text-sm">Saved successfully!</span>}
+          {saved && <span className="text-green-400 self-center text-sm">Saved!</span>}
         </div>
       </form>
 
@@ -293,8 +420,11 @@ export function Admin() {
         <div className="space-y-3">
           {movies.map((m) => (
             <div key={m.id} className="flex items-center gap-4 bg-[#111] border border-[#222] rounded-xl p-4">
-              <img src={m.posterUrl} alt={m.title}
-                className="w-14 h-20 object-cover rounded-lg shrink-0" />
+              {m.posterUrl ? (
+                <img src={m.posterUrl} alt={m.title} className="w-14 h-20 object-cover rounded-lg shrink-0" />
+              ) : (
+                <div className="w-14 h-20 bg-[#222] rounded-lg shrink-0 flex items-center justify-center text-2xl">🎬</div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate">{m.title}</p>
                 <p className="text-sm text-gray-400">{m.year} · {m.category}</p>
@@ -302,8 +432,11 @@ export function Admin() {
                   {m.access === 'paid' ? `Paid — ₦${m.price}` : 'Free with ads'}
                 </p>
                 {m.videoUrl && (
-                  <p className="text-xs text-green-600 mt-1 truncate">
-                    {m.videoUrl.includes('drive.google') ? 'Google Drive' : m.videoUrl.includes('dropbox') ? 'Dropbox' : 'Direct'}: {m.videoUrl.slice(0, 50)}...
+                  <p className="text-xs text-green-600 mt-1">
+                    {m.videoUrl.includes('drive.google') ? '📁 Google Drive'
+                      : m.videoUrl.includes('dropbox') ? '📦 Dropbox'
+                      : m.videoUrl.includes('cloudinary') ? '☁️ Cloudinary (uploaded)'
+                      : '🎬 Direct link'}
                   </p>
                 )}
               </div>
