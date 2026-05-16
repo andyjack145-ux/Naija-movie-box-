@@ -2,9 +2,12 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
+const ADMIN_EMAIL = 'andyntuk@gmail.com'
+
 export function Navbar() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const isAdmin = user?.email === ADMIN_EMAIL
   const [search, setSearch] = useState('')
 
   function handleSearch(e: React.FormEvent) {
@@ -34,6 +37,9 @@ export function Navbar() {
         <Link to="/search" className="text-gray-400 hover:text-white transition-colors">Browse</Link>
         <Link to="/downloads" className="text-gray-400 hover:text-white transition-colors">Downloads</Link>
         <Link to="/upgrade" className="text-gray-400 hover:text-white transition-colors">Premium</Link>
+        <Link to="/admin" className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium">
+          Admin
+        </Link>
         {user ? (
           <Link to="/profile" className="bg-green-600 hover:bg-green-700 transition-colors px-3 py-1.5 rounded-full">
             Profile
