@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { saveMovie, getSavedMovies, deleteMovie } from '../utils/storage'
 import { Movie } from '../types'
 
-const ADMIN_PASSWORD = 'admin9ja'
+const ADMIN_EMAIL = 'andyntuk@gmail.com'
+const ADMIN_PASSWORD = '12345678'
 const CATEGORIES = ['Nollywood', 'Hollywood', 'Bollywood', 'K-Drama', 'Series', 'Other']
 
 function generateId() {
@@ -31,6 +32,7 @@ type UploadMode = 'link' | 'file'
 
 export function Admin() {
   const [authed, setAuthed] = useState(false)
+  const [adminEmail, setAdminEmail] = useState('')
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -51,7 +53,7 @@ export function Admin() {
   }, [])
 
   function handleLogin() {
-    if (pw === ADMIN_PASSWORD) {
+    if (adminEmail.toLowerCase() === ADMIN_EMAIL && pw === ADMIN_PASSWORD) {
       setAuthed(true)
       setPwError(false)
     } else {
@@ -182,17 +184,30 @@ export function Admin() {
   if (!authed) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-[#111] p-8 rounded-2xl w-full max-w-sm">
-          <h1 className="text-2xl font-bold mb-6 text-green-500">Admin Login</h1>
+        <div className="bg-[#111] border border-[#222] p-8 rounded-2xl w-full max-w-sm">
+          <h1 className="text-2xl font-bold mb-2 text-green-500">Admin Login</h1>
+          <p className="text-gray-500 text-sm mb-6">9JA STREAM Admin Panel</p>
+          <input
+            type="email"
+            placeholder="Admin email"
+            value={adminEmail}
+            onChange={(e) => setAdminEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            className="w-full p-3 rounded-lg bg-[#222] mb-3 text-white outline-none focus:ring-2 focus:ring-green-500"
+          />
           <input
             type="password"
             placeholder="Admin password"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            className="w-full p-3 rounded-lg bg-[#222] mb-3 text-white outline-none"
+            className="w-full p-3 rounded-lg bg-[#222] mb-3 text-white outline-none focus:ring-2 focus:ring-green-500"
           />
-          {pwError && <p className="text-red-400 text-sm mb-3">Incorrect password</p>}
+          {pwError && (
+            <p className="text-red-400 text-sm mb-3 bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+              Incorrect email or password.
+            </p>
+          )}
           <button
             onClick={handleLogin}
             className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg font-semibold transition-colors"
