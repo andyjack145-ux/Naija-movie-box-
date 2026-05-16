@@ -67,109 +67,137 @@ export function MovieDetail() {
   const hasVideo = !!movie.videoUrl
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <img
-        src={movie.backdropUrl || movie.posterUrl}
-        className="w-full h-[400px] object-cover rounded-2xl mb-6"
-        alt={movie.title}
-      />
-
-      <div className="flex flex-wrap gap-2 mb-3">
-        {movie.isTrending && (
-          <span className="bg-green-700 text-white text-xs px-2 py-1 rounded-full">Trending</span>
-        )}
-        {movie.isNewRelease && (
-          <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">New Release</span>
-        )}
-        {movie.category && (
-          <span className="bg-[#222] text-gray-300 text-xs px-2 py-1 rounded-full">{movie.category}</span>
-        )}
-      </div>
-
-      <h1 className="text-4xl font-bold mb-2">{movie.title}</h1>
-
-      <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
-        {movie.year && <span>{movie.year}</span>}
-        {movie.duration && <span>{movie.duration}</span>}
-        {movie.rating && <span>⭐ {movie.rating}/10</span>}
-      </div>
-
-      {movie.genres && movie.genres.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {movie.genres.map((g) => (
-            <span key={g} className="bg-[#1a1a1a] border border-[#333] text-sm px-3 py-1 rounded-full">{g}</span>
-          ))}
-        </div>
-      )}
-
-      <p className="text-gray-300 mb-6 leading-relaxed">{movie.synopsis}</p>
-
-      {movie.cast && movie.cast.length > 0 && (
-        <div className="mb-8">
-          <h3 className="font-semibold mb-1 text-gray-400 text-sm uppercase tracking-wide">Cast</h3>
-          <p className="text-gray-300">{movie.cast.join(', ')}</p>
-        </div>
-      )}
-
-      {/* Watch options */}
-      {!hasVideo ? (
-        <div className="bg-[#111] border border-[#222] rounded-2xl p-6 text-center text-gray-500">
-          Video coming soon
-        </div>
-      ) : paid ? (
-        /* Already paid — go straight to ad-free player */
-        <div className="bg-[#111] border border-green-800 rounded-2xl p-6">
-          <p className="text-green-400 font-semibold mb-1">✓ You own the ad-free version</p>
-          <p className="text-gray-400 text-sm mb-4">Enjoy watching without any interruptions.</p>
-          <Link
-            to={`/player/${movie.id}`}
-            className="bg-green-600 hover:bg-green-700 transition-colors px-8 py-3 rounded-xl font-semibold inline-block"
-          >
-            Watch Now (Ad-Free)
-          </Link>
-        </div>
-      ) : (
-        /* Two options side by side */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Free with ads */}
-          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col">
-            <div className="mb-4 flex-1">
-              <p className="font-bold text-lg mb-1">Watch Free</p>
-              <p className="text-gray-400 text-sm">Short ad before the movie starts. No payment needed.</p>
+    <>
+      {/* Blur overlay while Paystack is open */}
+      {payLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+          style={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', background: 'rgba(0,0,0,0.65)' }}>
+          <div className="bg-[#111] border border-[#2a2a2a] rounded-3xl p-10 flex flex-col items-center gap-5 shadow-2xl max-w-sm w-full mx-4 text-center">
+            {/* Spinner */}
+            <div className="w-14 h-14 rounded-full border-4 border-[#2a2a2a] border-t-green-500 animate-spin" />
+            <div>
+              <p className="text-xl font-bold mb-1">Opening Payment</p>
+              <p className="text-gray-400 text-sm">Secure checkout is loading…</p>
             </div>
-            <Link
-              to={`/player/${movie.id}`}
-              className="bg-[#1a1a1a] border border-[#333] hover:bg-[#222] transition-colors px-6 py-3 rounded-xl text-center font-medium"
-            >
-              Watch with Ads
-            </Link>
-          </div>
-
-          {/* Pay ₦200 ad-free */}
-          <div className="bg-[#111] border border-yellow-700 rounded-2xl p-6 flex flex-col">
-            <div className="mb-4 flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-bold text-lg">Ad-Free</p>
-                <span className="bg-yellow-600 text-white text-xs px-2 py-0.5 rounded-full">₦{AD_FREE_PRICE}</span>
-              </div>
-              <p className="text-gray-400 text-sm">Pay once, watch this movie ad-free anytime. One-time purchase.</p>
+            <div className="bg-[#1a1a1a] rounded-2xl px-5 py-3 w-full">
+              <p className="text-gray-500 text-xs mb-1">You are paying</p>
+              <p className="text-3xl font-black text-yellow-400">₦{AD_FREE_PRICE}</p>
+              <p className="text-gray-500 text-xs mt-1">One-time · Ad-free for <span className="text-white">{movie.title}</span></p>
             </div>
             <button
-              onClick={handlePaystack}
-              disabled={payLoading}
-              className="bg-yellow-600 hover:bg-yellow-700 transition-colors px-6 py-3 rounded-xl font-semibold disabled:opacity-60"
+              onClick={() => setPayLoading(false)}
+              className="text-gray-600 text-xs hover:text-gray-400 transition-colors"
             >
-              {payLoading ? 'Processing...' : `Pay ₦${AD_FREE_PRICE} & Watch`}
+              Cancel
             </button>
-            {payError && <p className="text-red-400 text-xs mt-2">{payError}</p>}
-            {!user && (
-              <p className="text-gray-500 text-xs mt-2 text-center">
-                <Link to="/login" className="text-green-400 hover:underline">Log in</Link> to purchase
-              </p>
-            )}
           </div>
         </div>
       )}
-    </div>
+
+      <div className="p-6 max-w-4xl mx-auto">
+        <img
+          src={movie.backdropUrl || movie.posterUrl}
+          className="w-full h-[400px] object-cover rounded-2xl mb-6"
+          alt={movie.title}
+        />
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          {movie.isTrending && (
+            <span className="bg-green-700 text-white text-xs px-2 py-1 rounded-full">Trending</span>
+          )}
+          {movie.isNewRelease && (
+            <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">New Release</span>
+          )}
+          {movie.category && (
+            <span className="bg-[#222] text-gray-300 text-xs px-2 py-1 rounded-full">{movie.category}</span>
+          )}
+        </div>
+
+        <h1 className="text-4xl font-bold mb-2">{movie.title}</h1>
+
+        <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
+          {movie.year && <span>{movie.year}</span>}
+          {movie.duration && <span>{movie.duration}</span>}
+          {movie.rating && <span>⭐ {movie.rating}/10</span>}
+        </div>
+
+        {movie.genres && movie.genres.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {movie.genres.map((g) => (
+              <span key={g} className="bg-[#1a1a1a] border border-[#333] text-sm px-3 py-1 rounded-full">{g}</span>
+            ))}
+          </div>
+        )}
+
+        <p className="text-gray-300 mb-6 leading-relaxed">{movie.synopsis}</p>
+
+        {movie.cast && movie.cast.length > 0 && (
+          <div className="mb-8">
+            <h3 className="font-semibold mb-1 text-gray-400 text-sm uppercase tracking-wide">Cast</h3>
+            <p className="text-gray-300">{movie.cast.join(', ')}</p>
+          </div>
+        )}
+
+        {/* Watch options */}
+        {!hasVideo ? (
+          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 text-center text-gray-500">
+            Video coming soon
+          </div>
+        ) : paid ? (
+          <div className="bg-[#111] border border-green-800 rounded-2xl p-6">
+            <p className="text-green-400 font-semibold mb-1">✓ You own the ad-free version</p>
+            <p className="text-gray-400 text-sm mb-4">Enjoy watching without any interruptions.</p>
+            <Link
+              to={`/player/${movie.id}`}
+              className="bg-green-600 hover:bg-green-700 transition-colors px-8 py-3 rounded-xl font-semibold inline-block"
+            >
+              Watch Now (Ad-Free)
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Free with ads */}
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col">
+              <div className="mb-4 flex-1">
+                <p className="font-bold text-lg mb-1">Watch Free</p>
+                <p className="text-gray-400 text-sm">Short ad before the movie starts. No payment needed.</p>
+              </div>
+              <Link
+                to={`/player/${movie.id}`}
+                className="bg-[#1a1a1a] border border-[#333] hover:bg-[#222] transition-colors px-6 py-3 rounded-xl text-center font-medium"
+              >
+                Watch with Ads
+              </Link>
+            </div>
+
+            {/* Pay ₦200 ad-free */}
+            <div className="bg-[#111] border border-yellow-700 rounded-2xl p-6 flex flex-col">
+              <div className="mb-4 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="font-bold text-lg">Ad-Free</p>
+                  <span className="bg-yellow-600 text-white text-xs px-2 py-0.5 rounded-full">₦{AD_FREE_PRICE}</span>
+                </div>
+                <p className="text-gray-400 text-sm">Pay once, watch this movie ad-free anytime. One-time purchase.</p>
+              </div>
+              <button
+                onClick={handlePaystack}
+                disabled={payLoading}
+                className="bg-yellow-600 hover:bg-yellow-700 transition-colors px-6 py-3 rounded-xl font-semibold disabled:opacity-60"
+              >
+                {payLoading ? 'Opening payment…' : `Pay ₦${AD_FREE_PRICE} & Watch`}
+              </button>
+              {payError && (
+                <p className="text-red-400 text-xs mt-2">{payError}</p>
+              )}
+              {!user && (
+                <p className="text-gray-500 text-xs mt-2 text-center">
+                  <Link to="/login" className="text-green-400 hover:underline">Log in</Link> to purchase
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
