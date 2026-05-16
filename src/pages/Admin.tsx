@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { saveMovie, getSavedMovies, deleteMovie } from '../utils/storage'
+import { saveMovie, getSavedMovies, deleteMovie, getStats } from '../utils/storage'
 import { Movie } from '../types'
+import { MOCK_MOVIES } from '../data/mockData'
 
 const ADMIN_EMAIL = 'andyntuk@gmail.com'
 const ADMIN_PASSWORD = '12345678'
@@ -32,11 +33,13 @@ type UploadMode = 'link' | 'file'
 
 export function Admin() {
   const [authed, setAuthed] = useState(false)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'movies'>('dashboard')
   const [adminEmail, setAdminEmail] = useState('')
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [movies, setMovies] = useState<Movie[]>([])
+  const [stats, setStats] = useState(getStats())
   const [saved, setSaved] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [uploadMode, setUploadMode] = useState<UploadMode>('file')
@@ -50,6 +53,7 @@ export function Admin() {
 
   useEffect(() => {
     setMovies(getSavedMovies())
+    setStats(getStats())
   }, [])
 
   function handleLogin() {
@@ -144,12 +148,15 @@ export function Admin() {
       isNewRelease: form.isNewRelease,
     }
     saveMovie(movie)
-    setMovies(getSavedMovies())
+    const updated = getSavedMovies()
+    setMovies(updated)
+    setStats(getStats())
     setForm(emptyForm)
     setEditingId(null)
     setUploadProgress(0)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+    setActiveTab('movies')
   }
 
   function handleEdit(movie: Movie) {
@@ -219,11 +226,124 @@ export function Admin() {
     )
   }
 
-  return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2 text-green-500">Admin Panel</h1>
-      <p className="text-gray-400 mb-8 text-sm">Upload videos directly or paste a Google Drive / Dropbox link</p>
+  const totalAllMovies = movies.length + MOCK_MOVIES.length
 
+  return (
+    <div className="p-6 max-w-5xl mx-auto">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-green-500">Admin Panel</h1>
+          <p className="text-gray-500 text-sm mt-1">{ADMIN_EMAIL}</p>
+        </div>
+        <button
+          onClick={() => setStats(getStats())}
+          className="text-xs bg-[#222] hover:bg-[#2a2a2a] px-3 py-2 rounded-lg text-gray-400 transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-8 border-b border-[#222] pb-0">
+        {(['dashboard', 'upload', 'movies'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-5 py-2.5 text-sm font-medium capitalize rounded-t-lg transition-colors ${
+              activeTab === tab
+                ? 'bg-[#111] border border-b-[#111] border-[#222] text-green-400 -mb-px'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {tab === 'upload' ? 'Add Movie' : tab === 'movies' ? `Movies (${movies.length})` : tab}
+          </button>
+        ))}
+      </div>
+
+      {/* ── DASHBOARD TAB ── */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-6">
+
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Registered Users', value: stats.totalUsers, color: 'text-green-400', icon: '👤' },
+              { label: 'Total Movies', value: totalAllMovies, color: 'text-blue-400', icon: '🎬' },
+              { label: 'Uploaded Movies', value: stats.totalMovies, color: 'text-purple-400', icon: '☁️' },
+              { label: 'Paid Purchases', value: stats.totalPurchases, color: 'text-yellow-400', icon: '💳' },
+            ].map((s) => (
+              <div key={s.label} className="bg-[#111] border border-[#222] rounded-2xl p-5">
+                <p className="text-2xl mb-2">{s.icon}</p>
+                <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+                <p className="text-gray-500 text-xs mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Secondary stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-5">
+              <p className="text-sm text-gray-400 mb-3 font-medium">Movie Breakdown</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Free movies</span>
+                  <span className="text-white font-medium">{stats.freeMovies + MOCK_MOVIES.filter(m => m.access !== 'paid').length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Paid movies</span>
+                  <span className="text-yellow-400 font-medium">{stats.paidMovies + MOCK_MOVIES.filter(m => m.access === 'paid').length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Paying users</span>
+                  <span className="text-green-400 font-medium">{stats.payingUsers}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 bg-[#111] border border-[#222] rounded-2xl p-5">
+              <p className="text-sm text-gray-400 mb-3 font-medium">Registered Users</p>
+              {stats.userList.length === 0 ? (
+                <p className="text-gray-600 text-sm">No users have signed up yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {stats.userList.map((u) => (
+                    <div key={u.email} className="flex items-center gap-3 py-2 border-b border-[#1a1a1a] last:border-0">
+                      <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-sm font-bold shrink-0">
+                        {u.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{u.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setActiveTab('upload')}
+              className="bg-green-600 hover:bg-green-700 transition-colors px-6 py-3 rounded-xl text-sm font-semibold"
+            >
+              + Add New Movie
+            </button>
+            <button
+              onClick={() => setActiveTab('movies')}
+              className="bg-[#111] border border-[#222] hover:bg-[#1a1a1a] transition-colors px-6 py-3 rounded-xl text-sm"
+            >
+              Manage Movies
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD MOVIE TAB ── */}
+      {activeTab === 'upload' && (
+      <>
       {!cloudName && (
         <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4 mb-6 text-sm text-yellow-300">
           <strong>Direct upload not configured.</strong> To enable uploading video files from your computer, add{' '}
@@ -426,49 +546,78 @@ export function Admin() {
           {saved && <span className="text-green-400 self-center text-sm">Saved!</span>}
         </div>
       </form>
+      </>
+      )}
 
-      <h2 className="text-xl font-semibold mb-4">Uploaded Movies ({movies.length})</h2>
+      {/* ── MOVIES TAB ── */}
+      {activeTab === 'movies' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Uploaded Movies ({movies.length})</h2>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className="text-sm bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+            >
+              + Add Movie
+            </button>
+          </div>
 
-      {movies.length === 0 ? (
-        <p className="text-gray-500">No movies added yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {movies.map((m) => (
-            <div key={m.id} className="flex items-center gap-4 bg-[#111] border border-[#222] rounded-xl p-4">
-              {m.posterUrl ? (
-                <img src={m.posterUrl} alt={m.title} className="w-14 h-20 object-cover rounded-lg shrink-0" />
-              ) : (
-                <div className="w-14 h-20 bg-[#222] rounded-lg shrink-0 flex items-center justify-center text-2xl">🎬</div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{m.title}</p>
-                <p className="text-sm text-gray-400">{m.year} · {m.category}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {m.access === 'paid' ? `Paid — ₦${m.price}` : 'Free with ads'}
-                </p>
-                {m.videoUrl && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {m.videoUrl.includes('drive.google') ? '📁 Google Drive'
-                      : m.videoUrl.includes('dropbox') ? '📦 Dropbox'
-                      : m.videoUrl.includes('cloudinary') ? '☁️ Cloudinary (uploaded)'
-                      : '🎬 Direct link'}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col gap-2 shrink-0">
-                <button onClick={() => handleEdit(m)}
-                  className="text-xs bg-[#222] hover:bg-[#333] px-3 py-1.5 rounded-lg transition-colors">
-                  Edit
-                </button>
-                <button onClick={() => handleDelete(m.id)}
-                  className="text-xs bg-red-900/40 hover:bg-red-900/70 text-red-400 px-3 py-1.5 rounded-lg transition-colors">
-                  Delete
-                </button>
-              </div>
+          {movies.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-4xl mb-3">🎬</p>
+              <p className="text-gray-500 mb-4">No movies uploaded yet.</p>
+              <button
+                onClick={() => setActiveTab('upload')}
+                className="bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl text-sm font-semibold transition-colors"
+              >
+                Upload Your First Movie
+              </button>
             </div>
-          ))}
+          ) : (
+            <div className="space-y-3">
+              {movies.map((m) => (
+                <div key={m.id} className="flex items-center gap-4 bg-[#111] border border-[#222] rounded-xl p-4">
+                  {m.posterUrl ? (
+                    <img src={m.posterUrl} alt={m.title} className="w-14 h-20 object-cover rounded-lg shrink-0" />
+                  ) : (
+                    <div className="w-14 h-20 bg-[#222] rounded-lg shrink-0 flex items-center justify-center text-2xl">🎬</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{m.title}</p>
+                    <p className="text-sm text-gray-400">{m.year} · {m.category}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {m.access === 'paid' ? `Paid — ₦${m.price}` : 'Free with ads'}
+                    </p>
+                    {m.videoUrl && (
+                      <p className="text-xs text-green-600 mt-1">
+                        {m.videoUrl.includes('drive.google') ? '📁 Google Drive'
+                          : m.videoUrl.includes('dropbox') ? '📦 Dropbox'
+                          : m.videoUrl.includes('cloudinary') ? '☁️ Cloudinary (uploaded)'
+                          : '🎬 Direct link'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                      onClick={() => { handleEdit(m); setActiveTab('upload') }}
+                      className="text-xs bg-[#222] hover:bg-[#333] px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      className="text-xs bg-red-900/40 hover:bg-red-900/70 text-red-400 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
     </div>
   )
 }

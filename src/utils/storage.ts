@@ -55,3 +55,41 @@ export function isMoviePaid(movieId: string, email: string): boolean {
     return false
   }
 }
+
+export function getStats() {
+  try {
+    const usersRaw = localStorage.getItem('naija_stream_users')
+    const users: Record<string, any> = usersRaw ? JSON.parse(usersRaw) : {}
+    const userList = Object.entries(users).map(([email, data]: [string, any]) => ({
+      email,
+      name: data.name,
+    }))
+
+    const paidRaw = localStorage.getItem(PAID_KEY)
+    const paid: Record<string, string[]> = paidRaw ? JSON.parse(paidRaw) : {}
+    const totalPurchases = Object.values(paid).reduce((sum, arr) => sum + arr.length, 0)
+    const payingUsers = Object.keys(paid).length
+
+    const movies = getSavedMovies()
+
+    return {
+      totalUsers: userList.length,
+      userList,
+      totalMovies: movies.length,
+      totalPurchases,
+      payingUsers,
+      freeMovies: movies.filter((m) => m.access !== 'paid').length,
+      paidMovies: movies.filter((m) => m.access === 'paid').length,
+    }
+  } catch {
+    return {
+      totalUsers: 0,
+      userList: [],
+      totalMovies: 0,
+      totalPurchases: 0,
+      payingUsers: 0,
+      freeMovies: 0,
+      paidMovies: 0,
+    }
+  }
+}
