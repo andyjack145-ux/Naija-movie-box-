@@ -14,6 +14,7 @@ import { Downloads } from './pages/Downloads'
 import { Profile } from './pages/Profile'
 import { Upgrade } from './pages/Upgrade'
 import { Search } from './pages/Search'
+import { Admin } from './pages/Admin'
 
 import { Navbar } from './components/layout/Navbar'
 import { Footer } from './components/layout/Footer'
@@ -28,7 +29,6 @@ export function App() {
         <Router>
           <div className="bg-black text-white min-h-screen flex flex-col">
             <Navbar />
-
             <main className="flex-1">
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -40,9 +40,9 @@ export function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/upgrade" element={<Upgrade />} />
                 <Route path="/search" element={<Search />} />
+                <Route path="/admin" element={<Admin />} />
               </Routes>
             </main>
-
             <Footer />
           </div>
         </Router>

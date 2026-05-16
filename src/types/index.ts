@@ -14,4 +14,5 @@ export interface Movie {
   isNewRelease?: boolean
   access?: 'free' | 'paid'
   price?: number
+  videoUrl?: string
 }

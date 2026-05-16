@@ -1,15 +1,42 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MOCK_MOVIES } from '../data/mockData'
+import { getAllMovies } from '../utils/storage'
 import { MovieCard } from '../components/movie/MovieCard'
+import { Movie } from '../types'
 
 export function Search() {
-  const [query, setQuery] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [movies, setMovies] = useState<Movie[]>([])
 
-  const results = query
-    ? MOCK_MOVIES.filter((m) =>
-        m.title.toLowerCase().includes(query.toLowerCase())
+  useEffect(() => {
+    setMovies(getAllMovies(MOCK_MOVIES))
+  }, [])
+
+  useEffect(() => {
+    const q = searchParams.get('q') || ''
+    setQuery(q)
+  }, [searchParams])
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value
+    setQuery(val)
+    if (val.trim()) {
+      setSearchParams({ q: val })
+    } else {
+      setSearchParams({})
+    }
+  }
+
+  const results = query.trim()
+    ? movies.filter((m) =>
+        m.title.toLowerCase().includes(query.toLowerCase()) ||
+        (m.genres || []).some((g) => g.toLowerCase().includes(query.toLowerCase())) ||
+        (m.cast || []).some((c) => c.toLowerCase().includes(query.toLowerCase())) ||
+        (m.category || '').toLowerCase().includes(query.toLowerCase())
       )
-    : MOCK_MOVIES
+    : movies
 
   return (
     <div className="p-6">
@@ -17,11 +44,16 @@ export function Search() {
 
       <input
         type="text"
-        placeholder="Search movies..."
+        placeholder="Search by title, genre, cast, category..."
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={handleChange}
         className="w-full p-3 rounded-lg bg-[#222] mb-6 text-white outline-none focus:ring-2 focus:ring-green-500"
+        autoFocus
       />
+
+      <p className="text-sm text-gray-500 mb-4">
+        {query ? `${results.length} result${results.length !== 1 ? 's' : ''} for "${query}"` : `${results.length} movies`}
+      </p>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {results.map((movie) => (
