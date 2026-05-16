@@ -42,3 +42,9 @@ externalPort = 3001
 deploymentTarget = "static"
 build = ["npm", "run", "build"]
 publicDir = "dist"
+
+[userenv]
+
+[userenv.shared]
+VITE_CLOUDINARY_CLOUD_NAME = "andyjack145@gmail.com"
+VITE_CLOUDINARY_UPLOAD_PRESET = "movie_uploads"
