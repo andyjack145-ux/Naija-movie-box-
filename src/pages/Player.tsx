@@ -69,13 +69,15 @@ export function Player() {
                 AD
               </span>
               <div className="max-w-sm">
-                <p className="text-3xl font-black mb-3">9JA STREAM Premium</p>
-                <p className="text-gray-400 mb-6 text-sm">Skip ads and watch unlimited movies with a premium plan</p>
+                <p className="text-3xl font-black mb-3">9JA STREAM</p>
+                <p className="text-gray-400 mb-6 text-sm leading-relaxed">
+                  Pay <span className="text-yellow-400 font-bold">₦200</span> once to watch this movie ad-free, anytime.
+                </p>
                 <Link
-                  to="/upgrade"
-                  className="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-xl text-sm font-semibold transition-colors inline-block mb-6"
+                  to={`/movie/${movie.id}`}
+                  className="bg-yellow-600 hover:bg-yellow-700 px-8 py-3 rounded-xl text-sm font-semibold transition-colors inline-block mb-6"
                 >
-                  Go Premium
+                  Pay ₦200 — Skip Ads
                 </Link>
                 <p className="text-gray-500 text-sm">
                   Your movie starts in <span className="text-white font-bold text-lg">{adCountdown}</span>s
@@ -113,8 +115,8 @@ export function Player() {
             <span className="text-green-500 text-sm font-medium">✓ Premium — watching ad-free</span>
           )}
           {!paid && adDone && (
-            <Link to="/upgrade" className="text-yellow-500 text-sm hover:underline">
-              Upgrade to remove ads
+            <Link to={`/movie/${movie.id}`} className="text-yellow-500 text-sm hover:underline">
+              Pay ₦200 to watch ad-free
             </Link>
           )}
         </div>

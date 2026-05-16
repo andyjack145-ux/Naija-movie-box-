@@ -502,22 +502,9 @@ export function Admin() {
         </div>
 
         <div className="flex flex-wrap gap-6 items-center">
-          <div>
-            <label className="text-sm text-gray-400 mb-1 block">Access</label>
-            <select name="access" value={form.access} onChange={handleChange}
-              className="p-3 rounded-lg bg-[#222] text-white outline-none focus:ring-2 focus:ring-green-500">
-              <option value="free">Free (with ads)</option>
-              <option value="paid">Paid (one-time)</option>
-            </select>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-3 text-sm text-gray-400">
+            All movies are <span className="text-white font-medium">free with ads</span>. Users pay <span className="text-yellow-400 font-bold">₦200</span> per movie to skip ads.
           </div>
-
-          {form.access === 'paid' && (
-            <div>
-              <label className="text-sm text-gray-400 mb-1 block">Price (₦)</label>
-              <input name="price" type="number" value={form.price} onChange={handleChange}
-                className="w-32 p-3 rounded-lg bg-[#222] text-white outline-none focus:ring-2 focus:ring-green-500" />
-            </div>
-          )}
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" name="isTrending" checked={form.isTrending} onChange={handleCheckbox}

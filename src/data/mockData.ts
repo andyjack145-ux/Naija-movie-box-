@@ -116,8 +116,7 @@ export const MOCK_MOVIES: Movie[] = [
     isTrending: true,
     isNewRelease: true,
     videoUrl: DEMO_VIDEO,
-    access: 'paid',
-    price: 300,
+    access: 'free',
   },
   {
     id: '7',
