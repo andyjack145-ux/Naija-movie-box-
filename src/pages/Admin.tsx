@@ -6,6 +6,9 @@ import { MOCK_MOVIES } from '../data/mockData'
 const ADMIN_EMAIL = 'andyntuk@gmail.com'
 const ADMIN_PASSWORD = '12345678'
 const CATEGORIES = ['Nollywood', 'Hollywood', 'Bollywood', 'K-Drama', 'Series', 'Other']
+const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY
+const TMDB_IMG = 'https://image.tmdb.org/t/p/w500'
+const TMDB_BACKDROP = 'https://image.tmdb.org/t/p/original'
 
 function generateId() {
   return 'movie_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)
@@ -47,6 +50,83 @@ export function Admin() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // TMDB auto-fill
+  const [tmdbQuery, setTmdbQuery] = useState('')
+  const [tmdbResults, setTmdbResults] = useState<any[]>([])
+  const [tmdbSearching, setTmdbSearching] = useState(false)
+  const [tmdbError, setTmdbError] = useState('')
+
+  async function searchTmdb() {
+    if (!tmdbQuery.trim()) return
+    if (!TMDB_KEY) {
+      setTmdbError('Add your VITE_TMDB_API_KEY secret to enable auto-fill.')
+      return
+    }
+    setTmdbSearching(true)
+    setTmdbError('')
+    setTmdbResults([])
+    try {
+      const res = await fetch(
+        `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(tmdbQuery)}&language=en-US&page=1`
+      )
+      const data = await res.json()
+      setTmdbResults((data.results || []).slice(0, 6))
+    } catch {
+      setTmdbError('Search failed. Check your API key.')
+    } finally {
+      setTmdbSearching(false)
+    }
+  }
+
+  async function fillFromTmdb(movie: any) {
+    setTmdbResults([])
+    setTmdbQuery('')
+    // Get full details + credits
+    let cast: string[] = []
+    let runtime = ''
+    try {
+      if (TMDB_KEY) {
+        const [detailRes, creditsRes] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/movie/${movie.id}?api_key=${TMDB_KEY}&language=en-US`),
+          fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_KEY}`),
+        ])
+        const detail = await detailRes.json()
+        const credits = await creditsRes.json()
+        cast = (credits.cast || []).slice(0, 6).map((c: any) => c.name)
+        if (detail.runtime) {
+          const h = Math.floor(detail.runtime / 60)
+          const m = detail.runtime % 60
+          runtime = h > 0 ? `${h}h ${m}m` : `${m}m`
+        }
+      }
+    } catch {}
+    setForm((f) => ({
+      ...f,
+      title: movie.title || '',
+      year: movie.release_date ? Number(movie.release_date.slice(0, 4)) : f.year,
+      rating: movie.vote_average ? Math.round(movie.vote_average * 10) / 10 : f.rating,
+      synopsis: movie.overview || '',
+      posterUrl: movie.poster_path ? `${TMDB_IMG}${movie.poster_path}` : f.posterUrl,
+      backdropUrl: movie.backdrop_path ? `${TMDB_BACKDROP}${movie.backdrop_path}` : f.backdropUrl,
+      genres: (movie.genre_ids || []).length > 0
+        ? mapTmdbGenres(movie.genre_ids).join(', ')
+        : f.genres,
+      cast: cast.join(', '),
+      duration: runtime || f.duration,
+    }))
+  }
+
+  function mapTmdbGenres(ids: number[]): string[] {
+    const map: Record<number, string> = {
+      28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy',
+      80: 'Crime', 99: 'Documentary', 18: 'Drama', 10751: 'Family',
+      14: 'Fantasy', 36: 'History', 27: 'Horror', 10402: 'Music',
+      9648: 'Mystery', 10749: 'Romance', 878: 'Sci-Fi', 10770: 'TV Movie',
+      53: 'Thriller', 10752: 'War', 37: 'Western',
+    }
+    return ids.map((id) => map[id]).filter(Boolean)
+  }
 
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
@@ -357,6 +437,72 @@ export function Admin() {
         <h2 className="text-xl font-semibold mb-2">
           {editingId ? 'Edit Movie' : 'Add New Movie'}
         </h2>
+
+        {/* ── TMDB Auto-fill ── */}
+        <div className="bg-[#0d0d0d] border border-green-900 rounded-2xl p-4">
+          <p className="text-sm font-semibold text-green-400 mb-3">
+            ✨ Auto-Fill from Movie Database
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={tmdbQuery}
+              onChange={(e) => setTmdbQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchTmdb())}
+              placeholder="Search any movie name e.g. King of Boys, Black Panther…"
+              className="flex-1 p-3 rounded-lg bg-[#1a1a1a] text-white outline-none focus:ring-2 focus:ring-green-500 text-sm"
+            />
+            <button
+              type="button"
+              onClick={searchTmdb}
+              disabled={tmdbSearching}
+              className="bg-green-600 hover:bg-green-700 transition-colors px-5 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 shrink-0"
+            >
+              {tmdbSearching ? 'Searching…' : 'Search'}
+            </button>
+          </div>
+
+          {tmdbError && (
+            <p className="text-red-400 text-xs mt-2">{tmdbError}</p>
+          )}
+
+          {!TMDB_KEY && (
+            <p className="text-yellow-500 text-xs mt-2">
+              Add <code className="bg-black/30 px-1 rounded">VITE_TMDB_API_KEY</code> to your Secrets to enable this feature.
+            </p>
+          )}
+
+          {tmdbResults.length > 0 && (
+            <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1">
+              {tmdbResults.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => fillFromTmdb(m)}
+                  className="w-full flex items-center gap-3 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] hover:border-green-700 rounded-xl p-3 text-left transition-all"
+                >
+                  {m.poster_path ? (
+                    <img
+                      src={`${TMDB_IMG}${m.poster_path}`}
+                      alt={m.title}
+                      className="w-10 h-14 object-cover rounded-lg shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-14 bg-[#333] rounded-lg shrink-0 flex items-center justify-center text-lg">🎬</div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate">{m.title}</p>
+                    <p className="text-xs text-gray-400">
+                      {m.release_date?.slice(0, 4)} · ⭐ {m.vote_average?.toFixed(1)}
+                    </p>
+                    <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{m.overview?.slice(0, 80)}…</p>
+                  </div>
+                  <span className="text-green-500 text-xs shrink-0 font-medium ml-auto">Use →</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
