@@ -1,0 +1,21 @@
+{
+  "name": "9JA STREAM",
+  "short_name": "9JA STREAM",
+  "description": "Nigerian movie streaming platform — watch free with ads or pay ₦200 ad-free.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#16a34a",
+  "background_color": "#000000",
+  "categories": ["entertainment"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
