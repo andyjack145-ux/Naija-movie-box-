@@ -2,6 +2,54 @@ import { Movie } from '../types'
 
 const MOVIES_KEY = 'naija_stream_movies'
 const PAID_KEY = 'naija_stream_paid'
+const REVIEWS_KEY = 'naija_stream_reviews'
+
+export interface Review {
+  id: string
+  movieId: string
+  userEmail: string
+  userName: string
+  rating: number
+  comment: string
+  createdAt: number
+}
+
+export function getReviews(movieId: string): Review[] {
+  try {
+    const raw = localStorage.getItem(REVIEWS_KEY)
+    const all: Review[] = raw ? JSON.parse(raw) : []
+    return all.filter((r) => r.movieId === movieId).sort((a, b) => b.createdAt - a.createdAt)
+  } catch {
+    return []
+  }
+}
+
+export function addReview(review: Omit<Review, 'id' | 'createdAt'>): void {
+  try {
+    const raw = localStorage.getItem(REVIEWS_KEY)
+    const all: Review[] = raw ? JSON.parse(raw) : []
+    all.push({ ...review, id: `${Date.now()}_${Math.random()}`, createdAt: Date.now() })
+    localStorage.setItem(REVIEWS_KEY, JSON.stringify(all))
+  } catch {}
+}
+
+export function deleteReview(reviewId: string): void {
+  try {
+    const raw = localStorage.getItem(REVIEWS_KEY)
+    const all: Review[] = raw ? JSON.parse(raw) : []
+    localStorage.setItem(REVIEWS_KEY, JSON.stringify(all.filter((r) => r.id !== reviewId)))
+  } catch {}
+}
+
+export function hasUserReviewed(movieId: string, email: string): boolean {
+  try {
+    const raw = localStorage.getItem(REVIEWS_KEY)
+    const all: Review[] = raw ? JSON.parse(raw) : []
+    return all.some((r) => r.movieId === movieId && r.userEmail === email)
+  } catch {
+    return false
+  }
+}
 
 export function getSavedMovies(): Movie[] {
   try {
