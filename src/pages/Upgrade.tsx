@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MOCK_MOVIES } from '../data/mockData'
-import { getAllMovies, isMoviePaid, markMoviePaid } from '../utils/storage'
+import { getAllMovies, getPaidMovieIds, markMoviePaid } from '../utils/storage'
 import { useAuth } from '../context/AuthContext'
+import { Movie } from '../types'
 
 const AD_FREE_PRICE = 200
 
@@ -13,13 +14,27 @@ declare global {
 export function Upgrade() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const allMovies = getAllMovies(MOCK_MOVIES)
+  const [allMovies, setAllMovies] = useState<Movie[]>([])
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set())
+
+  async function loadData() {
+    const movies = await getAllMovies(MOCK_MOVIES)
+    setAllMovies(movies)
+    if (user?.email) {
+      const ids = await getPaidMovieIds(user.email)
+      setPaidIds(new Set(ids))
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [user])
 
   function handlePay(movieId: string, movieTitle: string) {
     if (!user?.email) { navigate('/login'); return }
-    const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY
-    if (!publicKey) {
-      alert('Payment is not live yet — Paystack keys are being set up. Please check back soon.')
+    const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d278bb5641ab08317fde54de73fc2d23956ba322'
+    if (!window.PaystackPop) {
+      alert('Payment system is still loading. Please wait a moment and try again.')
       return
     }
     const handler = window.PaystackPop.setup({
@@ -30,8 +45,8 @@ export function Upgrade() {
       ref: `adFree_${movieId}_${Date.now()}`,
       metadata: { movieId, movieTitle },
       onClose() {},
-      callback() {
-        markMoviePaid(movieId, user.email)
+      async callback() {
+        await markMoviePaid(movieId, user!.email)
         navigate(`/player/${movieId}`)
       },
     })
@@ -75,7 +90,7 @@ export function Upgrade() {
       <h2 className="text-xl font-bold mb-5">Pick a Movie to Watch Ad-Free</h2>
       <div className="space-y-3">
         {allMovies.map((m) => {
-          const alreadyPaid = user?.email ? isMoviePaid(m.id, user.email) : false
+          const alreadyPaid = paidIds.has(m.id)
           return (
             <div key={m.id} className="flex items-center gap-4 bg-[#111] border border-[#222] rounded-xl p-4">
               {m.posterUrl ? (

@@ -11,7 +11,7 @@ export function Search() {
   const [movies, setMovies] = useState<Movie[]>([])
 
   useEffect(() => {
-    setMovies(getAllMovies(MOCK_MOVIES))
+    getAllMovies(MOCK_MOVIES).then(setMovies)
   }, [])
 
   useEffect(() => {

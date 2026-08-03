@@ -1,143 +1,149 @@
+import { supabase } from './supabase'
 import { Movie } from '../types'
 
-const MOVIES_KEY = 'naija_stream_movies'
-const PAID_KEY = 'naija_stream_paid'
-const REVIEWS_KEY = 'naija_stream_reviews'
+/* ================= TYPES ================= */
 
-export interface Review {
+export type Review = {
   id: string
   movieId: string
   userEmail: string
   userName: string
   rating: number
   comment: string
-  createdAt: number
+  timestamp?: number
+  created_at?: string
 }
 
-export function getReviews(movieId: string): Review[] {
-  try {
-    const raw = localStorage.getItem(REVIEWS_KEY)
-    const all: Review[] = raw ? JSON.parse(raw) : []
-    return all.filter((r) => r.movieId === movieId).sort((a, b) => b.createdAt - a.createdAt)
-  } catch {
+/* ================= MOVIES ================= */
+
+export async function getSavedMovies(): Promise<Movie[]> {
+  const { data, error } = await supabase
+    .from('movies')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.log(error)
     return []
   }
+
+  return data || []
 }
 
-export function addReview(review: Omit<Review, 'id' | 'createdAt'>): void {
-  try {
-    const raw = localStorage.getItem(REVIEWS_KEY)
-    const all: Review[] = raw ? JSON.parse(raw) : []
-    all.push({ ...review, id: `${Date.now()}_${Math.random()}`, createdAt: Date.now() })
-    localStorage.setItem(REVIEWS_KEY, JSON.stringify(all))
-  } catch {}
+export async function getAllMovies(fallback: Movie[]): Promise<Movie[]> {
+  const saved = await getSavedMovies()
+  if (saved.length > 0) return saved
+  return fallback
 }
 
-export function deleteReview(reviewId: string): void {
-  try {
-    const raw = localStorage.getItem(REVIEWS_KEY)
-    const all: Review[] = raw ? JSON.parse(raw) : []
-    localStorage.setItem(REVIEWS_KEY, JSON.stringify(all.filter((r) => r.id !== reviewId)))
-  } catch {}
+export async function saveMovie(movie: Movie) {
+  const { error } = await supabase
+    .from('movies')
+    .upsert(movie)
+
+  if (error) console.log(error)
 }
 
-export function hasUserReviewed(movieId: string, email: string): boolean {
-  try {
-    const raw = localStorage.getItem(REVIEWS_KEY)
-    const all: Review[] = raw ? JSON.parse(raw) : []
-    return all.some((r) => r.movieId === movieId && r.userEmail === email)
-  } catch {
-    return false
-  }
+export async function deleteMovie(id: string) {
+  await supabase.from('movies').delete().eq('id', id)
 }
 
-export function getSavedMovies(): Movie[] {
-  try {
-    const raw = localStorage.getItem(MOVIES_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
+/* ================= REVIEWS ================= */
+
+export async function getReviews(movieId: string): Promise<Review[]> {
+  const { data } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('movieId', movieId)
+    .order('created_at', { ascending: false })
+
+  return (data as Review[]) || []
 }
 
-export function saveMovie(movie: Movie): void {
-  const movies = getSavedMovies()
-  const idx = movies.findIndex((m) => m.id === movie.id)
-  if (idx >= 0) {
-    movies[idx] = movie
-  } else {
-    movies.push(movie)
-  }
-  localStorage.setItem(MOVIES_KEY, JSON.stringify(movies))
+export async function addReview(review: Omit<Review, 'id'>) {
+  await supabase.from('reviews').insert([review])
 }
 
-export function deleteMovie(id: string): void {
-  const movies = getSavedMovies().filter((m) => m.id !== id)
-  localStorage.setItem(MOVIES_KEY, JSON.stringify(movies))
+export async function deleteReview(id: string) {
+  await supabase.from('reviews').delete().eq('id', id)
 }
 
-export function getAllMovies(mockMovies: Movie[]): Movie[] {
-  const saved = getSavedMovies()
-  const savedIds = new Set(saved.map((m) => m.id))
-  const filtered = mockMovies.filter((m) => !savedIds.has(m.id))
-  return [...saved, ...filtered]
+export async function hasUserReviewed(movieId: string, email: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('reviews')
+    .select('id')
+    .eq('movieId', movieId)
+    .eq('userEmail', email)
+  return (data?.length || 0) > 0
 }
 
-export function markMoviePaid(movieId: string, email: string): void {
-  try {
-    const raw = localStorage.getItem(PAID_KEY)
-    const paid: Record<string, string[]> = raw ? JSON.parse(raw) : {}
-    if (!paid[email]) paid[email] = []
-    if (!paid[email].includes(movieId)) paid[email].push(movieId)
-    localStorage.setItem(PAID_KEY, JSON.stringify(paid))
-  } catch {}
+/* ================= WATCHLIST ================= */
+
+export async function getWatchlist(email: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('watchlist')
+    .select('*')
+    .eq('email', email)
+
+  return data?.map((w) => w.movieId) || []
 }
 
-export function isMoviePaid(movieId: string, email: string): boolean {
-  try {
-    const raw = localStorage.getItem(PAID_KEY)
-    if (!raw) return false
-    const paid: Record<string, string[]> = JSON.parse(raw)
-    return (paid[email] || []).includes(movieId)
-  } catch {
-    return false
-  }
+export async function addToWatchlist(movieId: string, email: string) {
+  await supabase.from('watchlist').insert([{ movieId, email }])
 }
 
-export function getStats() {
-  try {
-    const usersRaw = localStorage.getItem('naija_stream_users')
-    const users: Record<string, any> = usersRaw ? JSON.parse(usersRaw) : {}
-    const userList = Object.entries(users).map(([email, data]: [string, any]) => ({
-      email,
-      name: data.name,
-    }))
+export async function removeFromWatchlist(movieId: string, email: string) {
+  await supabase
+    .from('watchlist')
+    .delete()
+    .eq('movieId', movieId)
+    .eq('email', email)
+}
 
-    const paidRaw = localStorage.getItem(PAID_KEY)
-    const paid: Record<string, string[]> = paidRaw ? JSON.parse(paidRaw) : {}
-    const totalPurchases = Object.values(paid).reduce((sum, arr) => sum + arr.length, 0)
-    const payingUsers = Object.keys(paid).length
+export async function isInWatchlist(movieId: string, email: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('watchlist')
+    .select('id')
+    .eq('movieId', movieId)
+    .eq('email', email)
 
-    const movies = getSavedMovies()
+  return (data?.length || 0) > 0
+}
 
-    return {
-      totalUsers: userList.length,
-      userList,
-      totalMovies: movies.length,
-      totalPurchases,
-      payingUsers,
-      freeMovies: movies.filter((m) => m.access !== 'paid').length,
-      paidMovies: movies.filter((m) => m.access === 'paid').length,
-    }
-  } catch {
-    return {
-      totalUsers: 0,
-      userList: [],
-      totalMovies: 0,
-      totalPurchases: 0,
-      payingUsers: 0,
-      freeMovies: 0,
-      paidMovies: 0,
-    }
-  }
+/* ================= PAYMENTS ================= */
+
+export async function markMoviePaid(movieId: string, email: string) {
+  await supabase.from('payments').insert([{ movieId, email }])
+}
+
+export async function isMoviePaid(movieId: string, email: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('payments')
+    .select('id')
+    .eq('movieId', movieId)
+    .eq('email', email)
+
+  return (data?.length || 0) > 0
+}
+
+export async function getPaidMovieIds(email: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('payments')
+    .select('movieId')
+    .eq('email', email)
+  return data?.map((p: any) => p.movieId) || []
+}
+
+/* ================= SUBMISSIONS ================= */
+
+export async function addPendingSubmission(submission: any) {
+  await supabase.from('submissions').insert([submission])
+}
+
+export async function getPendingSubmissions() {
+  const { data } = await supabase
+    .from('submissions')
+    .select('*')
+    .order('created_at', { ascending: false })
+  return data || []
 }

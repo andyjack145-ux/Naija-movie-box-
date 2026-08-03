@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MOCK_MOVIES } from '../data/mockData'
-import { getAllMovies, isMoviePaid, markMoviePaid } from '../utils/storage'
+import { getAllMovies, getPaidMovieIds, markMoviePaid } from '../utils/storage'
 import { toDownloadUrl } from '../utils/cloudUrl'
 import { Movie } from '../types'
 import { useAuth } from '../context/AuthContext'
@@ -19,15 +19,21 @@ export function Downloads() {
   const [otherMovies, setOtherMovies] = useState<Movie[]>([])
   const [downloading, setDownloading] = useState<string | null>(null)
 
-  useEffect(() => {
-    const all = getAllMovies(MOCK_MOVIES)
+  async function loadMovies() {
+    const all = await getAllMovies(MOCK_MOVIES)
     if (user?.email) {
-      setPaidMovies(all.filter((m) => isMoviePaid(m.id, user.email) && m.videoUrl))
-      setOtherMovies(all.filter((m) => !isMoviePaid(m.id, user.email) && m.videoUrl))
+      const paidIds = await getPaidMovieIds(user.email)
+      const paidSet = new Set(paidIds)
+      setPaidMovies(all.filter((m) => paidSet.has(m.id) && m.videoUrl))
+      setOtherMovies(all.filter((m) => !paidSet.has(m.id) && m.videoUrl))
     } else {
       setPaidMovies([])
       setOtherMovies(all.filter((m) => m.videoUrl))
     }
+  }
+
+  useEffect(() => {
+    loadMovies()
   }, [user])
 
   function triggerDownload(movie: Movie) {
@@ -46,9 +52,9 @@ export function Downloads() {
 
   function handlePay(movieId: string, movieTitle: string) {
     if (!user?.email) { navigate('/login'); return }
-    const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY
-    if (!publicKey) {
-      alert('Payment is not live yet. Please check back soon.')
+    const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d278bb5641ab08317fde54de73fc2d23956ba322'
+    if (!window.PaystackPop) {
+      alert('Payment system is still loading. Please wait a moment and try again.')
       return
     }
     const handler = window.PaystackPop.setup({
@@ -59,11 +65,9 @@ export function Downloads() {
       ref: `adFree_${movieId}_${Date.now()}`,
       metadata: { movieId, movieTitle },
       onClose() {},
-      callback() {
-        markMoviePaid(movieId, user.email)
-        const all = getAllMovies(MOCK_MOVIES)
-        setPaidMovies(all.filter((m) => isMoviePaid(m.id, user.email) && m.videoUrl))
-        setOtherMovies(all.filter((m) => !isMoviePaid(m.id, user.email) && m.videoUrl))
+      async callback() {
+        await markMoviePaid(movieId, user!.email)
+        await loadMovies()
       },
     })
     handler.openIframe()

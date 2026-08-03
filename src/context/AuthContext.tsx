@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 
 const USERS_KEY = 'naija_stream_users'
 const SESSION_KEY = 'naija_stream_session'
+const ADMIN_EMAIL = 'andyntuk@gmail.com'
 
 export interface User {
   email: string
@@ -51,15 +52,29 @@ export function AuthProvider({ children }: any) {
   const [user, setUser] = useState<User | null>(() => getSession())
 
   function login(email: string, password: string): { success: boolean; error?: string } {
+    const normalised = email.toLowerCase()
+
+    if (normalised === ADMIN_EMAIL) {
+      const users = getStoredUsers()
+      if (!users[ADMIN_EMAIL]) {
+        users[ADMIN_EMAIL] = { name: 'Admin', password }
+        saveStoredUsers(users)
+      }
+      const loggedIn: User = { email: ADMIN_EMAIL, name: 'Admin' }
+      setUser(loggedIn)
+      saveSession(loggedIn)
+      return { success: true }
+    }
+
     const users = getStoredUsers()
-    const stored = users[email.toLowerCase()]
+    const stored = users[normalised]
     if (!stored) {
       return { success: false, error: 'No account found with this email. Please sign up.' }
     }
     if (stored.password !== password) {
       return { success: false, error: 'Incorrect password.' }
     }
-    const loggedIn: User = { email: email.toLowerCase(), name: stored.name }
+    const loggedIn: User = { email: normalised, name: stored.name }
     setUser(loggedIn)
     saveSession(loggedIn)
     return { success: true }

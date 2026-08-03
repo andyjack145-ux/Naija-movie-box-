@@ -34,8 +34,10 @@ function StarRating({ value, onChange, readonly }: { value: number; onChange?: (
   )
 }
 
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts
+function timeAgo(ts: number | string | undefined): string {
+  if (!ts) return ''
+  const time = typeof ts === 'string' ? new Date(ts).getTime() : ts
+  const diff = Date.now() - time
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`
@@ -62,20 +64,32 @@ export function MovieDetail() {
   const [reviewSuccess, setReviewSuccess] = useState(false)
 
   useEffect(() => {
-    const all = getAllMovies(MOCK_MOVIES)
-    const found = all.find((m) => m.id === id) || null
-    setMovie(found)
-    if (found && user?.email) {
-      setPaid(isMoviePaid(found.id, user.email))
-      setAlreadyReviewed(hasUserReviewed(found.id, user.email))
+    async function load() {
+      const all = await getAllMovies(MOCK_MOVIES)
+      const found = all.find((m) => m.id === id) || null
+      setMovie(found)
+      if (found && user?.email) {
+        const [paidStatus, reviewed, reviewList] = await Promise.all([
+          isMoviePaid(found.id, user.email),
+          hasUserReviewed(found.id, user.email),
+          getReviews(found.id),
+        ])
+        setPaid(paidStatus)
+        setAlreadyReviewed(reviewed)
+        setReviews(reviewList)
+      } else if (found) {
+        const reviewList = await getReviews(found.id)
+        setReviews(reviewList)
+      }
     }
-    if (found) {
-      setReviews(getReviews(found.id))
-    }
+    load()
   }, [id, user])
 
-  function refreshReviews() {
-    if (id) setReviews(getReviews(id))
+  async function refreshReviews() {
+    if (id) {
+      const reviewList = await getReviews(id)
+      setReviews(reviewList)
+    }
   }
 
   function handlePaystack() {
@@ -99,8 +113,8 @@ export function MovieDetail() {
       ref: `adFree_${movie.id}_${Date.now()}`,
       metadata: { movieId: movie.id, movieTitle: movie.title },
       onClose() { setPayLoading(false) },
-      callback() {
-        markMoviePaid(movie.id, user.email)
+      async callback() {
+        await markMoviePaid(movie.id, user.email)
         setPaid(true)
         setPayLoading(false)
         navigate(`/player/${movie.id}`)
@@ -109,30 +123,34 @@ export function MovieDetail() {
     handler.openIframe()
   }
 
-  function handleSubmitReview(e: React.FormEvent) {
+  async function handleSubmitReview(e: React.FormEvent) {
     e.preventDefault()
     setReviewError('')
     if (!user) { setReviewError('You must be logged in to leave a review.'); return }
     if (rating === 0) { setReviewError('Please select a star rating.'); return }
     if (comment.trim().length < 5) { setReviewError('Please write at least a short comment.'); return }
-    addReview({
+    await addReview({
       movieId: id!,
       userEmail: user.email,
       userName: user.name || user.email.split('@')[0],
       rating,
       comment: comment.trim(),
+      timestamp: Date.now(),
     })
     setAlreadyReviewed(true)
     setReviewSuccess(true)
     setRating(0)
     setComment('')
-    refreshReviews()
+    await refreshReviews()
   }
 
-  function handleDeleteReview(reviewId: string) {
-    deleteReview(reviewId)
-    refreshReviews()
-    if (user?.email && id) setAlreadyReviewed(hasUserReviewed(id, user.email))
+  async function handleDeleteReview(reviewId: string) {
+    await deleteReview(reviewId)
+    await refreshReviews()
+    if (user?.email && id) {
+      const reviewed = await hasUserReviewed(id, user.email)
+      setAlreadyReviewed(reviewed)
+    }
   }
 
   const avgRating = reviews.length
@@ -148,163 +166,118 @@ export function MovieDetail() {
   return (
     <>
       {payLoading && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-          style={{ backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', background: 'rgba(0,0,0,0.65)' }}>
-          <div className="bg-[#111] border border-[#2a2a2a] rounded-3xl p-10 flex flex-col items-center gap-5 shadow-2xl max-w-sm w-full mx-4 text-center">
-            <div className="w-14 h-14 rounded-full border-4 border-[#2a2a2a] border-t-green-500 animate-spin" />
-            <div>
-              <p className="text-xl font-bold mb-1">Opening Payment</p>
-              <p className="text-gray-400 text-sm">Secure checkout is loading…</p>
-            </div>
-            <div className="bg-[#1a1a1a] rounded-2xl px-5 py-3 w-full">
-              <p className="text-gray-500 text-xs mb-1">You are paying</p>
-              <p className="text-3xl font-black text-yellow-400">₦{AD_FREE_PRICE}</p>
-              <p className="text-gray-500 text-xs mt-1">One-time · Ad-free for <span className="text-white">{movie.title}</span></p>
-            </div>
-            <button onClick={() => setPayLoading(false)} className="text-gray-600 text-xs hover:text-gray-400 transition-colors">
-              Cancel
-            </button>
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-white font-semibold">Opening payment…</p>
           </div>
         </div>
       )}
 
-      <div className="p-6 max-w-4xl mx-auto">
-        <img
-          src={movie.backdropUrl || movie.posterUrl}
-          className="w-full h-[400px] object-cover rounded-2xl mb-6"
-          alt={movie.title}
-        />
-
-        <div className="flex flex-wrap gap-2 mb-3">
-          {movie.isTrending && (
-            <span className="bg-green-700 text-white text-xs px-2 py-1 rounded-full">Trending</span>
-          )}
-          {movie.isNewRelease && (
-            <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">New Release</span>
-          )}
-          {movie.category && (
-            <span className="bg-[#222] text-gray-300 text-xs px-2 py-1 rounded-full">{movie.category}</span>
-          )}
-        </div>
-
-        <h1 className="text-4xl font-bold mb-2">{movie.title}</h1>
-
-        <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
-          {movie.year && <span>{movie.year}</span>}
-          {movie.duration && <span>{movie.duration}</span>}
-          {movie.rating && <span>⭐ {movie.rating}/10</span>}
-          {avgRating && (
-            <span className="text-yellow-400">★ {avgRating}/5 ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})</span>
-          )}
-        </div>
-
-        {movie.genres && movie.genres.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {movie.genres.map((g) => (
-              <span key={g} className="bg-[#1a1a1a] border border-[#333] text-sm px-3 py-1 rounded-full">{g}</span>
-            ))}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Backdrop */}
+        {movie.backdropUrl && (
+          <div className="relative w-full h-48 md:h-72 rounded-2xl overflow-hidden mb-6">
+            <img src={movie.backdropUrl} alt={movie.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
           </div>
         )}
 
-        <p className="text-gray-300 mb-6 leading-relaxed">{movie.synopsis}</p>
+        {/* Info */}
+        <div className="flex gap-6 mb-8">
+          {movie.posterUrl && (
+            <img
+              src={movie.posterUrl}
+              alt={movie.title}
+              className="w-28 md:w-40 rounded-xl object-cover shrink-0 -mt-16 relative z-10 shadow-xl"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold mb-1">{movie.title}</h1>
+            <div className="flex flex-wrap gap-2 text-sm text-gray-400 mb-3">
+              {movie.year && <span>{movie.year}</span>}
+              {movie.category && <span>· {movie.category}</span>}
+              {movie.rating !== undefined && movie.rating > 0 && (
+                <span>· ⭐ {movie.rating}</span>
+              )}
+              {avgRating && <span>· 👥 {avgRating}/5</span>}
+            </div>
+            {(movie.genres || []).length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-3">
+                {(movie.genres || []).map((g) => (
+                  <span key={g} className="text-xs bg-[#222] px-2 py-0.5 rounded-full text-gray-400">{g}</span>
+                ))}
+              </div>
+            )}
+            <p className="text-gray-300 text-sm leading-relaxed">{movie.synopsis}</p>
+          </div>
+        </div>
 
-        {movie.cast && movie.cast.length > 0 && (
+        {/* Cast */}
+        {(movie.cast || []).length > 0 && (
           <div className="mb-8">
-            <h3 className="font-semibold mb-1 text-gray-400 text-sm uppercase tracking-wide">Cast</h3>
-            <p className="text-gray-300">{movie.cast.join(', ')}</p>
+            <h2 className="text-lg font-semibold mb-2">Cast</h2>
+            <p className="text-gray-400 text-sm">{(movie.cast || []).join(', ')}</p>
           </div>
         )}
 
         {/* Watch options */}
-        {!hasVideo ? (
-          <div className="bg-[#111] border border-[#222] rounded-2xl p-6 text-center text-gray-500">
-            Video coming soon
-          </div>
-        ) : paid ? (
-          <div className="bg-[#111] border border-green-800 rounded-2xl p-6">
-            <p className="text-green-400 font-semibold mb-1">✓ You own the ad-free version</p>
-            <p className="text-gray-400 text-sm mb-4">Enjoy watching without any interruptions.</p>
-            <Link
-              to={`/player/${movie.id}`}
-              className="bg-green-600 hover:bg-green-700 transition-colors px-8 py-3 rounded-xl font-semibold inline-block"
-            >
-              Watch Now (Ad-Free)
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col">
-              <div className="mb-4 flex-1">
-                <p className="font-bold text-lg mb-1">Watch Free</p>
-                <p className="text-gray-400 text-sm">Short ad before the movie starts. No payment needed.</p>
-              </div>
+        <div className="bg-[#111] border border-[#222] rounded-2xl p-6 mb-10">
+          <h2 className="text-lg font-semibold mb-4">Watch Options</h2>
+          {!hasVideo ? (
+            <p className="text-gray-500 text-sm">No video available yet. Check back soon.</p>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 to={`/player/${movie.id}`}
-                className="bg-[#1a1a1a] border border-[#333] hover:bg-[#222] transition-colors px-6 py-3 rounded-xl text-center font-medium"
+                className="flex-1 text-center bg-[#1a1a1a] border border-[#333] hover:bg-[#222] transition-colors px-5 py-3 rounded-xl font-medium"
               >
-                Watch with Ads
+                📺 Watch Free
+                <span className="block text-xs text-gray-500 mt-0.5">Short ad before movie</span>
               </Link>
-            </div>
-
-            <div className="bg-[#111] border border-yellow-700 rounded-2xl p-6 flex flex-col">
-              <div className="mb-4 flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="font-bold text-lg">Ad-Free</p>
-                  <span className="bg-yellow-600 text-white text-xs px-2 py-0.5 rounded-full">₦{AD_FREE_PRICE}</span>
-                </div>
-                <p className="text-gray-400 text-sm">Pay once, watch this movie ad-free anytime. One-time purchase.</p>
-              </div>
-              <button
-                onClick={handlePaystack}
-                disabled={payLoading}
-                className="bg-yellow-600 hover:bg-yellow-700 transition-colors px-6 py-3 rounded-xl font-semibold disabled:opacity-60"
-              >
-                {payLoading ? 'Opening payment…' : `Pay ₦${AD_FREE_PRICE} & Watch`}
-              </button>
-              {payError && <p className="text-red-400 text-xs mt-2">{payError}</p>}
-              {!user && (
-                <p className="text-gray-500 text-xs mt-2 text-center">
-                  <Link to="/login" className="text-green-400 hover:underline">Log in</Link> to purchase
-                </p>
+              {paid ? (
+                <Link
+                  to={`/player/${movie.id}`}
+                  className="flex-1 text-center bg-green-700 hover:bg-green-600 transition-colors px-5 py-3 rounded-xl font-medium"
+                >
+                  ✓ Watch Ad-Free
+                  <span className="block text-xs text-green-300 mt-0.5">Already unlocked</span>
+                </Link>
+              ) : (
+                <button
+                  onClick={handlePaystack}
+                  className="flex-1 text-center bg-yellow-600 hover:bg-yellow-700 transition-colors px-5 py-3 rounded-xl font-medium"
+                >
+                  ⚡ Pay ₦{AD_FREE_PRICE} — Watch Ad-Free
+                  <span className="block text-xs text-yellow-200 mt-0.5">One-time payment</span>
+                </button>
               )}
             </div>
-          </div>
-        )}
+          )}
+          {payError && (
+            <p className="text-red-400 text-sm mt-3">{payError}</p>
+          )}
+          {!user && (
+            <p className="text-gray-500 text-xs mt-3">
+              <Link to="/login" className="text-green-400 hover:underline">Log in</Link> to purchase
+            </p>
+          )}
+        </div>
 
-        {/* Reviews Section */}
-        <div className="mt-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">
-              Reviews
-              {reviews.length > 0 && (
-                <span className="ml-2 text-base font-normal text-gray-400">({reviews.length})</span>
-              )}
-            </h2>
-            {avgRating && (
-              <div className="flex items-center gap-2 bg-[#111] border border-[#222] rounded-xl px-4 py-2">
-                <span className="text-yellow-400 text-xl font-bold">{avgRating}</span>
-                <StarRating value={Math.round(Number(avgRating))} readonly />
-              </div>
+        {/* Reviews */}
+        <div>
+          <h2 className="text-xl font-bold mb-6">
+            Reviews
+            {reviews.length > 0 && (
+              <span className="ml-2 text-base font-normal text-gray-400">({reviews.length})</span>
             )}
-          </div>
+          </h2>
 
-          {/* Write a review */}
-          {!user ? (
-            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 text-center mb-6">
-              <p className="text-gray-400 mb-3">Want to leave a review?</p>
-              <Link to="/login" className="bg-green-600 hover:bg-green-700 transition-colors px-6 py-2 rounded-xl font-semibold inline-block text-sm">
-                Log in to Review
-              </Link>
-            </div>
-          ) : alreadyReviewed && !reviewSuccess ? (
-            <div className="bg-[#111] border border-[#222] rounded-2xl p-4 text-center text-gray-400 text-sm mb-6">
-              ✓ You have already reviewed this movie
-            </div>
-          ) : !alreadyReviewed ? (
-            <form onSubmit={handleSubmitReview} className="bg-[#111] border border-[#222] rounded-2xl p-6 mb-6">
-              <h3 className="font-semibold mb-4">Write a Review</h3>
-              <div className="mb-4">
-                <p className="text-sm text-gray-400 mb-2">Your Rating</p>
+          {/* Submit review */}
+          {user && !alreadyReviewed && (
+            <form onSubmit={handleSubmitReview} className="bg-[#111] border border-[#222] rounded-2xl p-5 mb-6">
+              <h3 className="font-semibold mb-3">Write a Review</h3>
+              <div className="mb-3">
                 <StarRating value={rating} onChange={setRating} />
               </div>
               <textarea
@@ -312,57 +285,61 @@ export function MovieDetail() {
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Share your thoughts about this movie..."
                 rows={3}
-                className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-green-600 transition-colors"
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-sm text-white outline-none focus:border-green-500 resize-none"
               />
               {reviewError && <p className="text-red-400 text-xs mt-2">{reviewError}</p>}
+              {reviewSuccess && <p className="text-green-400 text-xs mt-2">Review posted!</p>}
               <button
                 type="submit"
-                className="mt-3 bg-green-600 hover:bg-green-700 transition-colors px-6 py-2 rounded-xl font-semibold text-sm"
+                className="mt-3 bg-green-600 hover:bg-green-700 px-6 py-2 rounded-xl text-sm font-semibold transition-colors"
               >
                 Post Review
               </button>
             </form>
-          ) : null}
+          )}
 
-          {reviewSuccess && (
-            <div className="bg-green-900/30 border border-green-700 rounded-2xl p-4 text-center text-green-400 text-sm mb-6">
-              ✓ Your review has been posted!
+          {!user && (
+            <p className="text-gray-500 text-sm mb-6">
+              <Link to="/login" className="text-green-400 hover:underline">Log in</Link> to leave a review.
+            </p>
+          )}
+
+          {alreadyReviewed && (
+            <div className="bg-green-900/20 border border-green-800/40 rounded-xl px-4 py-3 mb-6 text-sm text-green-400">
+              ✓ You've already reviewed this movie.
             </div>
           )}
 
-          {/* Review list */}
           {reviews.length === 0 ? (
-            <div className="text-center text-gray-500 py-10 bg-[#111] border border-[#222] rounded-2xl">
-              No reviews yet. Be the first to review this movie!
-            </div>
+            <p className="text-gray-500 text-sm text-center py-8">No reviews yet. Be the first!</p>
           ) : (
-            <div className="flex flex-col gap-4">
-              {reviews.map((r) => (
-                <div key={r.id} className="bg-[#111] border border-[#222] rounded-2xl p-5">
-                  <div className="flex items-start justify-between gap-4 mb-2">
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <div key={review.id} className="bg-[#111] border border-[#222] rounded-2xl p-5">
+                  <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-green-800 flex items-center justify-center text-sm font-bold uppercase">
-                        {r.userName.charAt(0)}
+                      <div className="w-8 h-8 rounded-full bg-green-800 flex items-center justify-center text-sm font-bold shrink-0">
+                        {(review.userName || review.userEmail || '?')[0].toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-semibold text-sm">{r.userName}</p>
-                        <p className="text-gray-500 text-xs">{timeAgo(r.createdAt)}</p>
+                        <p className="font-medium text-sm">{review.userName || review.userEmail.split('@')[0]}</p>
+                        <p className="text-xs text-gray-500">{timeAgo(review.created_at || review.timestamp)}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <StarRating value={r.rating} readonly />
-                      {user?.email === r.userEmail && (
+                    <div className="flex items-center gap-2">
+                      <StarRating value={review.rating} readonly />
+                      {user?.email === review.userEmail && (
                         <button
-                          onClick={() => handleDeleteReview(r.id)}
-                          className="text-gray-600 hover:text-red-400 transition-colors text-xs"
-                          title="Delete your review"
+                          onClick={() => handleDeleteReview(review.id)}
+                          className="text-gray-600 hover:text-red-400 transition-colors text-lg leading-none"
+                          title="Delete review"
                         >
                           ✕
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">{r.comment}</p>
+                  <p className="text-gray-300 text-sm leading-relaxed">{review.comment}</p>
                 </div>
               ))}
             </div>

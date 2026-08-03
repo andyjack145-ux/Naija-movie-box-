@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const ADMIN_EMAIL = 'andyntuk@gmail.com'
@@ -7,24 +7,54 @@ const ADMIN_EMAIL = 'andyntuk@gmail.com'
 export function Navbar() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const isAdmin = user?.email === ADMIN_EMAIL
   const [search, setSearch] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     if (search.trim()) {
       navigate(`/search?q=${encodeURIComponent(search.trim())}`)
       setSearch('')
+      setMenuOpen(false)
     }
   }
 
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const navLinks = [
+    { to: '/search', label: 'Browse' },
+    { to: '/downloads', label: 'Downloads' },
+    { to: '/upgrade', label: 'Premium' },
+    ...(user ? [{ to: '/watchlist', label: 'Watchlist' }] : []),
+    { to: '/submit', label: 'Submit a Movie' },
+    ...(isAdmin ? [{ to: '/admin', label: 'Admin Panel', admin: true }] : []),
+    user
+      ? { to: '/profile', label: 'Profile', highlight: true }
+      : { to: '/login', label: 'Login', highlight: true },
+  ]
+
   return (
-    <nav className="flex items-center gap-4 p-4 bg-[#111] border-b border-[#222] flex-wrap">
-      <Link to="/" className="text-2xl font-bold text-green-500 shrink-0">
+    <nav className="flex items-center gap-3 px-4 py-3 bg-[#111] border-b border-[#222] relative z-50">
+      <Link to="/" className="text-xl font-bold text-green-500 shrink-0">
         9JA STREAM
       </Link>
 
-      <form onSubmit={handleSearch} className="flex-1 min-w-[180px] max-w-sm">
+      <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-sm">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -33,21 +63,36 @@ export function Navbar() {
         />
       </form>
 
-      <div className="flex gap-3 items-center ml-auto text-sm flex-wrap">
-        <Link to="/search" className="text-gray-400 hover:text-white transition-colors">Browse</Link>
-        <Link to="/downloads" className="text-gray-400 hover:text-white transition-colors">Downloads</Link>
-        <Link to="/upgrade" className="text-gray-400 hover:text-white transition-colors">Premium</Link>
-        <Link to="/admin" className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium">
-          Admin
-        </Link>
-        {user ? (
-          <Link to="/profile" className="bg-green-600 hover:bg-green-700 transition-colors px-3 py-1.5 rounded-full">
-            Profile
-          </Link>
-        ) : (
-          <Link to="/login" className="bg-green-600 hover:bg-green-700 transition-colors px-3 py-1.5 rounded-full">
-            Login
-          </Link>
+      <div ref={menuRef} className="ml-auto relative">
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          className="flex flex-col justify-center items-center w-10 h-10 rounded-lg bg-[#222] hover:bg-[#2a2a2a] transition-colors gap-1.5"
+          aria-label="Menu"
+        >
+          <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
+          <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
+          <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+        </button>
+
+        {menuOpen && (
+          <div className="absolute right-0 top-12 w-56 bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl shadow-2xl overflow-hidden">
+            {navLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setMenuOpen(false)}
+                className={`flex items-center px-5 py-3.5 text-sm font-medium border-b border-[#222] last:border-0 transition-colors
+                  ${'admin' in link && link.admin
+                    ? 'text-yellow-400 hover:bg-yellow-500/10'
+                    : 'highlight' in link && link.highlight
+                    ? 'text-green-400 hover:bg-green-500/10'
+                    : 'text-gray-300 hover:bg-[#252525] hover:text-white'
+                  }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </nav>

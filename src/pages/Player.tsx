@@ -18,14 +18,17 @@ export function Player() {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    const all = getAllMovies(MOCK_MOVIES)
-    const found = all.find((m) => m.id === id) || null
-    setMovie(found)
-    if (found && user?.email) {
-      const hasPaid = isMoviePaid(found.id, user.email)
-      setPaid(hasPaid)
-      if (hasPaid) setAdDone(true)
+    async function load() {
+      const all = await getAllMovies(MOCK_MOVIES)
+      const found = all.find((m) => m.id === id) || null
+      setMovie(found)
+      if (found && user?.email) {
+        const hasPaid = await isMoviePaid(found.id, user.email)
+        setPaid(hasPaid)
+        if (hasPaid) setAdDone(true)
+      }
     }
+    load()
   }, [id, user])
 
   useEffect(() => {
@@ -87,11 +90,11 @@ export function Player() {
           )}
 
           {/* Video player */}
-          {source === 'gdrive' ? (
+          {source === 'gdrive' || source === 'youtube' ? (
             <iframe
               src={streamUrl}
               className="w-full h-full"
-              allow="autoplay; fullscreen"
+              allow="autoplay; fullscreen; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               title={movie.title}
               style={{ border: 'none' }}

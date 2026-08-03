@@ -15,6 +15,8 @@ import { Profile } from './pages/Profile'
 import { Upgrade } from './pages/Upgrade'
 import { Search } from './pages/Search'
 import { Admin } from './pages/Admin'
+import { Watchlist } from './pages/Watchlist'
+import { SubmitMovie } from './pages/SubmitMovie'
 
 import { Navbar } from './components/layout/Navbar'
 import { Footer } from './components/layout/Footer'
@@ -41,6 +43,8 @@ export function App() {
                 <Route path="/upgrade" element={<Upgrade />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/watchlist" element={<Watchlist />} />
+                <Route path="/submit" element={<SubmitMovie />} />
               </Routes>
             </main>
             <Footer />

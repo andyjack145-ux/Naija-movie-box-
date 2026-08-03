@@ -12,7 +12,7 @@ export function Home() {
   const [activeCategory, setActiveCategory] = useState('All')
 
   useEffect(() => {
-    setMovies(getAllMovies(MOCK_MOVIES))
+    getAllMovies(MOCK_MOVIES).then(setMovies)
   }, [])
 
   const trending = movies.filter((m) => m.isTrending)
